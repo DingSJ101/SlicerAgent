@@ -1,0 +1,269 @@
+import logging
+import os
+from typing import Annotated, Optional
+
+import vtk
+
+import slicer
+from slicer.i18n import tr as _
+from slicer.i18n import translate
+from slicer.ScriptedLoadableModule import *
+from slicer.util import VTKObservationMixin
+from slicer.parameterNodeWrapper import (
+    parameterNodeWrapper,
+    WithinRange,
+)
+
+from slicer import vtkMRMLScalarVolumeNode
+from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCursor
+
+import sys
+sys.path.append("/home/dsj/workspace/LLM/SlicerAgent")
+sys.path.append("/home/dsj/workspace/LLM/SlicerAgent/.venv/lib/python3.9/site-packages")
+try:
+    from app.agent.slicer_agent import SlicerAgentProcess
+except ImportError as e:
+    print(f"Error importing SlicerAgent: {e}")
+
+
+#
+# AgentUI
+#
+
+
+class AgentUI(ScriptedLoadableModule):
+    """Uses ScriptedLoadableModule base class, available at:
+    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
+    """
+
+    def __init__(self, parent):
+        ScriptedLoadableModule.__init__(self, parent)
+        self.parent.title = _("AgentUI")  # TODO: make this more human readable by adding spaces
+        # TODO: set categories (folders where the module shows up in the module selector)
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
+        self.parent.dependencies = []  # TODO: add here list of module names that this module requires
+        self.parent.contributors = ["John Doe (AnyWare Corp.)"]  # TODO: replace with "Firstname Lastname (Organization)"
+        # TODO: update with short description of the module and a link to online module documentation
+        # _() function marks text as translatable to other languages
+        self.parent.helpText = _("""
+This is an example of scripted loadable module bundled in an extension.
+See more information in <a href="https://github.com/organization/projectname#AgentUI">module documentation</a>.
+""")
+        # TODO: replace with organization, grant and thanks
+        self.parent.acknowledgementText = _("""
+This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc., Andras Lasso, PerkLab,
+and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
+""")
+
+
+#
+# AgentUIWidget
+#
+
+
+class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+    """Uses ScriptedLoadableModuleWidget base class, available at:
+    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
+    """
+
+    def __init__(self, parent=None) -> None:
+        """Called when the user opens the module the first time and the widget is initialized."""
+        ScriptedLoadableModuleWidget.__init__(self, parent)
+        VTKObservationMixin.__init__(self)  # needed for parameter node observation
+        self.logic = None
+        self.agent_process = SlicerAgentProcess()
+
+    def setup(self) -> None:
+        """Called when the user opens the module the first time and the widget is initialized."""
+        ScriptedLoadableModuleWidget.setup(self)
+
+        # Load widget from .ui file (created by Qt Designer).
+        # Additional widgets can be instantiated manually and added to self.layout.
+        uiWidget = slicer.util.loadUI(self.resourcePath("UI/AgentUI.ui"))
+        self.layout.addWidget(uiWidget)
+        self.ui = slicer.util.childWidgetVariables(uiWidget)
+
+        # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
+        # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
+        # "setMRMLScene(vtkMRMLScene*)" slot.
+        uiWidget.setMRMLScene(slicer.mrmlScene)
+
+        # Create logic class. Logic implements all computations that should be possible to run
+        # in batch mode, without a graphical user interface.
+        self.logic = AgentUILogic()
+
+        # Connections
+
+        # Buttons
+        # self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
+        self.ui.submitButton.clicked.connect(self.onSubmitClicked)
+        self.ui.inputLine.returnPressed.connect(self.onSubmitClicked)
+        self.agent_process.streaming_output.connect(self.onStreamingOutput)
+        self.agent_process.start_agent()
+
+    def onSubmitClicked(self):
+        """处理用户输入"""
+        user_input = self.ui.inputLine.text.strip()
+        if not user_input:
+            return
+
+        # 显示用户输入
+        self.ui.chatDisplay.append(f"<b>User:</b> {user_input}\n")
+        self.ui.inputLine.clear()
+
+        # 禁用输入以防止重复提交
+        # self.ui.inputLine.setEnabled(False)
+        # self.ui.submitButton.setEnabled(False)
+
+        # 将输入发送到工作线程
+        self.agent_process.send_messages(user_input)
+
+    def onStreamingOutput(self, s):
+        """显示流式输出"""
+        self.ui.chatDisplay.moveCursor(QTextCursor.End)
+        # self.ui.chatDisplay.insertHtml(chunk)
+        self.ui.chatDisplay.insertPlainText(s)
+        self.ui.chatDisplay.ensureCursorVisible()
+
+
+    def cleanup(self) -> None:
+        """Called when the application closes and the module widget is destroyed."""
+        ...
+
+    def enter(self) -> None:
+        """Called each time the user opens this module."""
+        # Make sure parameter node exists and observed
+        ...
+        
+
+    def exit(self) -> None:
+        """Called each time the user opens a different module."""
+        # Do not react to parameter node changes (GUI will be updated when the user enters into the module)
+        ...
+
+
+#
+# AgentUILogic
+#
+
+
+class AgentUILogic(ScriptedLoadableModuleLogic):
+    """This class should implement all the actual
+    computation done by your module.  The interface
+    should be such that other python code can import
+    this class and make use of the functionality without
+    requiring an instance of the Widget.
+    Uses ScriptedLoadableModuleLogic base class, available at:
+    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
+    """
+
+    def __init__(self) -> None:
+        """Called when the logic class is instantiated. Can be used for initializing member variables."""
+        ScriptedLoadableModuleLogic.__init__(self)
+
+    def process(self,
+                inputVolume: vtkMRMLScalarVolumeNode,
+                outputVolume: vtkMRMLScalarVolumeNode,
+                imageThreshold: float,
+                invert: bool = False,
+                showResult: bool = True) -> None:
+        """
+        Run the processing algorithm.
+        Can be used without GUI widget.
+        :param inputVolume: volume to be thresholded
+        :param outputVolume: thresholding result
+        :param imageThreshold: values above/below this threshold will be set to 0
+        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
+        :param showResult: show output volume in slice viewers
+        """
+
+        if not inputVolume or not outputVolume:
+            raise ValueError("Input or output volume is invalid")
+
+        import time
+
+        startTime = time.time()
+        logging.info("Processing started")
+
+        # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
+        cliParams = {
+            "InputVolume": inputVolume.GetID(),
+            "OutputVolume": outputVolume.GetID(),
+            "ThresholdValue": imageThreshold,
+            "ThresholdType": "Above" if invert else "Below",
+        }
+        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
+        # We don't need the CLI module node anymore, remove it to not clutter the scene with it
+        slicer.mrmlScene.RemoveNode(cliNode)
+
+        stopTime = time.time()
+        logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
+
+
+#
+# AgentUITest
+#
+
+
+class AgentUITest(ScriptedLoadableModuleTest):
+    """
+    This is the test case for your scripted module.
+    Uses ScriptedLoadableModuleTest base class, available at:
+    https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
+    """
+
+    def setUp(self):
+        """Do whatever is needed to reset the state - typically a scene clear will be enough."""
+        slicer.mrmlScene.Clear()
+
+    def runTest(self):
+        """Run as few or as many tests as needed here."""
+        self.setUp()
+        self.test_AgentUI1()
+
+    def test_AgentUI1(self):
+        """Ideally you should have several levels of tests.  At the lowest level
+        tests should exercise the functionality of the logic with different inputs
+        (both valid and invalid).  At higher levels your tests should emulate the
+        way the user would interact with your code and confirm that it still works
+        the way you intended.
+        One of the most important features of the tests is that it should alert other
+        developers when their changes will have an impact on the behavior of your
+        module.  For example, if a developer removes a feature that you depend on,
+        your test should break so they know that the feature is needed.
+        """
+
+        self.delayDisplay("Starting the test")
+
+        # Get/create input data
+
+        import SampleData
+
+        registerSampleData()
+        inputVolume = SampleData.downloadSample("AgentUI1")
+        self.delayDisplay("Loaded test data set")
+
+        inputScalarRange = inputVolume.GetImageData().GetScalarRange()
+        self.assertEqual(inputScalarRange[0], 0)
+        self.assertEqual(inputScalarRange[1], 695)
+
+        outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+        threshold = 100
+
+        # Test the module logic
+
+        logic = AgentUILogic()
+
+        # Test algorithm with non-inverted threshold
+        logic.process(inputVolume, outputVolume, threshold, True)
+        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
+        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
+        self.assertEqual(outputScalarRange[1], threshold)
+
+        # Test algorithm with inverted threshold
+        logic.process(inputVolume, outputVolume, threshold, False)
+        outputScalarRange = outputVolume.GetImageData().GetScalarRange()
+        self.assertEqual(outputScalarRange[0], inputScalarRange[0])
+        self.assertEqual(outputScalarRange[1], inputScalarRange[1])
+
+        self.delayDisplay("Test passed")
