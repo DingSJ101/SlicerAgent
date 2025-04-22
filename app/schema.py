@@ -40,16 +40,16 @@ class AgentState(str, Enum):
 
 
 class Function(BaseModel):
-    name: str
-    arguments: str
+    name: Optional[str] = None
+    arguments: Optional[str] = None
 
 
 class ToolCall(BaseModel):
     """Represents a tool/function call in a message"""
-
-    id: str
+    index: int = Field(default=-1)
+    id: Optional[str] = None
     type: str = "function"
-    function: Function
+    function: Optional[Function] = Field(default=None)
 
 
 class Message(BaseModel):
@@ -166,17 +166,43 @@ class MessageChunk(Message):
         self.type = "message"
         self.tool_calls = kwargs.get("tool_calls", None)
     def __add__(self, other) -> List["MessageChunk"]:
-        if isinstance(other, MessageChunk) and self.type == other.type and self.type == "message":
-            tool_calls = other.tool_calls or self.tool_calls
-            return self.__class__(
-                role = self.role,
-                content = self.content + other.content,
-                tool_calls = tool_calls,
-                )
-        else:
+        if not isinstance(other, MessageChunk):
             raise TypeError(
                 f"unsupported operand type(s) for +: '{type(self).__name__}' and '{type(other).__name__}'"
             )
+        new_content = self.content + other.content
+        if other.tool_calls is None:
+            new_tool_calls = self.tool_calls
+        else:
+            if self.tool_calls is None:
+                new_tool_calls = []
+            else:
+                new_tool_calls = list(self.tool_calls)
+            for delta in other.tool_calls:
+                i = delta.index
+                while len(new_tool_calls) <= i:
+                    new_tool_calls.append(None)
+                if new_tool_calls[i] is None:
+                    new_tool_calls[i] = ToolCall(
+                        index=delta.index,
+                        id=delta.id,
+                        type=delta.type,
+                        function=delta.function.model_dump(),
+                    )
+                else:
+                    existing = new_tool_calls[i]
+                    if delta.id is not None:
+                        existing.id = delta.id
+                    if delta.type is not None:
+                        existing.type = delta.type
+                    if delta.function is not None:
+                        if delta.function.name is not None:
+                            existing.function.name = delta.function.name
+                        if delta.function.arguments is not None:
+                            existing.function.arguments += delta.function.arguments
+        return self.__class__(content=new_content, tool_calls=new_tool_calls)
+
+        
 
 
 class Memory(BaseModel):
@@ -212,25 +238,30 @@ class Memory(BaseModel):
 class Payload(BaseModel):
     content: str
     type: str = Literal["message","image","info","error","command","system"]
-    def __init__(self, content: str, type: str = "message"):
-        super().__init__(content=content, type=type)
-        self.content = content
-        self.type = type
+    name: Optional[str] = None
+    def __init__(self, content: str, type: str = "message",name = None):
+        super().__init__(content=content, type=type, name=name)
+        # self.content = content
+        # self.type = type
+        # self.name = name
+
+    def model_dump(self):
+        if self.name is not None:
+            return {
+                "type": self.type,
+                "content": self.content,
+                "name": self.name
+            }
+        else:
+            return {
+                "type": self.type,
+                "content": self.content
+            }
 
     def write_structed_content(self):
         """
         Write structured information to stdout.
-        Format:
-            {
-                "type": "message"|"command"|"info"|"error", \n
-                "content": str
-            }
         """
-        # data = {
-        #         "type": self.type,
-        #         "content": self.content
-        #     }
-        # json.dump(data, sys.stdout)
         json.dump(self.model_dump(), sys.stdout)
         sys.stdout.flush()
     

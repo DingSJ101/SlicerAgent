@@ -9,7 +9,7 @@ from app.exceptions import TokenLimitExceeded
 from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
-from app.tool import CreateChatCompletion, Terminate, ToolCollection
+from app.tool import CreateChatCompletion, Terminate, ToolCollection, WebSearch
 from app.schema import MessageChunk, Payload
 
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
@@ -25,8 +25,9 @@ class ToolCallAgent(ReActAgent):
     next_step_prompt: str = NEXT_STEP_PROMPT
 
     available_tools: ToolCollection = ToolCollection(
-        # CreateChatCompletion(), 
-        Terminate()
+        CreateChatCompletion(), 
+        Terminate(),
+        WebSearch()
     )
     tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO  # type: ignore
     special_tool_names: List[str] = Field(default_factory=lambda: [Terminate().name])
@@ -267,6 +268,14 @@ class ToolCallAgent(ReActAgent):
 if __name__ == "__main__":
     question = "What is the capital of France?"
     question = "Tell me a joke!"
-    question = "我想要日本10天的旅行计划，4-26到5-5日，请你帮我做一份非常详细的旅行、餐饮 计划， 一 共两个人，预算3w，偏向自然风格 ，产出一个markdown，要具体的时间节点，以及通勤时间"
-    agent = ToolCallAgent()
+    question = "我想要日本10天的旅行计划，4-26到5-5日，请你帮我做一份非常详细的旅行、餐饮 计划， 一 共两个人，预算3w，偏向自然风格 ，以markdown格式回答，要具体的时间节点，以及通勤时间"
+    tools = ToolCollection(        
+        CreateChatCompletion(),
+        Terminate(),
+        WebSearch()
+    )
+    # agent = ToolCallAgent()
+    # asyncio.run(agent.run(question))
+    # agent = ToolCallAgent(available_tools=tools,streaming_output=False)
+    agent = ToolCallAgent(available_tools=tools)
     asyncio.run(agent.run(question))

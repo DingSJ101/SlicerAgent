@@ -756,6 +756,7 @@ class LLM:
                 self.client.chat.completions.create(**params)
 
             completion = MessageChunk()
+            current_function = None
             async for chunk in response:
                 content = chunk.choices[0].delta.content or ""
                 # chunk_message = MessageChunk(content)
@@ -763,8 +764,16 @@ class LLM:
                     content = content,
                     tool_calls= chunk.choices[0].delta.tool_calls,
                 )
-                payload = Payload(content)
-                payload.write_structed_content()
+                if content in ["", None] and chunk.choices[0].delta.tool_calls:
+                    if chunk.choices[0].delta.tool_calls[0].function.name:
+                        current_function = chunk.choices[0].delta.tool_calls[0].function.name
+                    content = chunk.choices[0].delta.tool_calls[0].function.arguments
+                    payload = Payload(content,type="command",name = current_function)
+                    payload.write_structed_content()
+                else:
+                    current_function = None
+                    payload = Payload(content)
+                    payload.write_structed_content()
                 completion += chunk_message
             return completion
 
