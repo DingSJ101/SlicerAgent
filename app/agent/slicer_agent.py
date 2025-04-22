@@ -33,28 +33,20 @@ try:
             #     fp.write(f"main process received (buffer size: {len(self._buffer)}): {raw}\n")
             
             start = 0
-            # while start < len(self._buffer):
-            #     try:
-            #         # Find the next complete JSON object
-            #         end = self._buffer.index('}', start) + 1
-            #         json_str = self._buffer[start:end]
-            #         data = json.loads(json_str)
-                    
-            #         if data.get("type") == "message":
-            #             content = data.get("content")
-            #             if content:
-            #                 self.streaming_output.emit(content)
-                    
-            #         start = end  # Move to next potential JSON
-            #     except (ValueError, json.JSONDecodeError):
-            #         # No complete JSON found, keep remaining data in buffer
-            #         break
             decoder = json.JSONDecoder()
             while True:
                 try:
                     # Try to decode a JSON object from the buffer
                     data, index = decoder.raw_decode(self._buffer, start)
                     if data.get("type") == "message":
+                        content = data.get("content")
+                        if content:
+                            self.streaming_output.emit(content)
+                    elif data.get("type") == "error":
+                        content = data.get("content")
+                        if content:
+                            print(f"Error: {content}")
+                    elif data.get("type") == "command" and data.get("name") == "create_chat_completion":
                         content = data.get("content")
                         if content:
                             self.streaming_output.emit(content)
@@ -122,7 +114,7 @@ class SlicerAgent(ToolCallAgent):
     streaming_output:bool = True
 
     # Add general-purpose tools to the tool collection
-    available_tools = ToolCollection(
+    available_tools:ToolCollection = ToolCollection(
         Terminate(), CreateChatCompletion(), WebSearch()
     )
 

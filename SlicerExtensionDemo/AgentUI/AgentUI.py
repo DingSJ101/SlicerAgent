@@ -108,7 +108,7 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             return
 
         # 显示用户输入
-        self.ui.chatDisplay.append(f"<b>User:</b> {user_input}\n")
+        self.ui.chatDisplay.append(f"<b>User:</b> {user_input}<br><b>Assistant:</b> ")
         self.ui.inputLine.clear()
 
         # 禁用输入以防止重复提交
@@ -121,14 +121,15 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def onStreamingOutput(self, s):
         """显示流式输出"""
         self.ui.chatDisplay.moveCursor(QTextCursor.End)
-        # self.ui.chatDisplay.insertHtml(chunk)
         self.ui.chatDisplay.insertPlainText(s)
         self.ui.chatDisplay.ensureCursorVisible()
 
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
-        ...
+        # Disconnect all observers
+        self.agent_process.streaming_output.disconnect(self.onStreamingOutput)
+        self.agent_process.close()
 
     def enter(self) -> None:
         """Called each time the user opens this module."""
