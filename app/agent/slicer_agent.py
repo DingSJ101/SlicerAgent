@@ -6,6 +6,7 @@ import sys
 import os
 import pathlib
 from app.logger import logger
+from typing import Literal
 # sys.path.append("/home/dsj/workspace/LLM/SlicerAgent")
 # sys.path.append("/home/dsj/workspace/LLM/SlicerAgent/.venv/lib/python3.9/site-packages")
 is_slicer_available = True
@@ -19,42 +20,46 @@ try:
         def __init__(self):
             super().__init__()
             self._buffer = ""
+            self._in_response_string = False  # Tracks if we're inside response string
             self.readyReadStandardOutput.connect(self._handle_stdout)
             self.errorOccurred.connect(lambda: print(f"进程错误: {self.errorString()}"))
 
-
         def _handle_stdout(self):
             raw = self.readAllStandardOutput().data().decode()
-            if raw is None:
+            if not raw:
                 return
             
             self._buffer += raw
-            # with open("/home/dsj/workspace/LLM/SlicerAgent/tmp.log", "a") as fp:
-            #     fp.write(f"main process received (buffer size: {len(self._buffer)}): {raw}\n")
-            
             start = 0
             decoder = json.JSONDecoder()
             while True:
                 try:
                     # Try to decode a JSON object from the buffer
                     data, index = decoder.raw_decode(self._buffer, start)
-                    if data.get("type") == "message":
-                        content = data.get("content")
-                        if content:
-                            self.streaming_output.emit(content)
-                    elif data.get("type") == "error":
-                        content = data.get("content")
-                        if content:
-                            print(f"Error: {content}")
-                    elif data.get("type") == "command" and data.get("name") == "create_chat_completion":
-                        content = data.get("content")
-                        if content:
-                            self.streaming_output.emit(content)
-                    # Move the start index to the end of the decoded JSON object
                     start = index
                 except json.JSONDecodeError:
                     # If decoding fails, break the loop
+                    if self._buffer[start:].strip():
+                        print("JSON decoding error, buffer:", self._buffer[start:].strip())
                     break
+                if data.get("type") == "message":
+                    content = data.get("content")
+                    if content:
+                        self.streaming_output.emit(content)
+                elif data.get("type") == "error":
+                    content = data.get("content")
+                    if content:
+                        print(f"Error: {content}")
+                elif data.get("type") == "command" and data.get("content"):
+                    content = data.get("content").replace("\\n", "\n")
+                    if data.get("name") == "create_chat_completion":
+                        if self._in_response_string :
+                            self.streaming_output.emit(content)
+                        else:
+                            if "response" in content:
+                                self._in_response_string = True
+                        continue
+                self._in_response_string = False
             # Keep only unprocessed data in buffer
             self._buffer = self._buffer[start:] if start < len(self._buffer) else ""
 
@@ -150,3 +155,17 @@ class SlicerAgent(ToolCallAgent):
             except Exception as e:
                 payload = Payload(content=f"Error in run_loop: {e}", type="error")
                 payload.write_structed_content()
+
+if __name__ == "__main__":
+    agent = SlicerAgent()
+    asyncio.run(agent.run_loop())
+
+# {"content": "who are you?", "type": "message"}
+
+# while SlicerAgent.run_loop():
+#     if SlicerAgent.run() > ToolCallAgent.run() > BaseAgent.run() > BaseAgent.run() :
+#         while BaseAgent.step() > ReActAgent.step() :
+#             ReActAgent.think() > ToolCallAgent.think()
+#             if ReActAgent.act() > ToolCallAgent.act():
+#                 ToolCallAgent.execute_tool()
+

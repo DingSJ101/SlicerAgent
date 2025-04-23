@@ -268,7 +268,8 @@ class ToolCallAgent(ReActAgent):
 if __name__ == "__main__":
     question = "What is the capital of France?"
     question = "Tell me a joke!"
-    question = "我想要日本10天的旅行计划，4-26到5-5日，请你帮我做一份非常详细的旅行、餐饮 计划， 一 共两个人，预算3w，偏向自然风格 ，以markdown格式回答，要具体的时间节点，以及通勤时间"
+    # question = "我想要日本10天的旅行计划，4-26到5-5日，请你帮我做一份非常详细的旅行、餐饮 计划， 一 共两个人，预算3w，偏向自然风格 ，以markdown格式回答，要具体的时间节点，以及通勤时间"
+    question = "generate a python code to calculate the sum of two numbers with create_chatcompletion tool"
     tools = ToolCollection(        
         CreateChatCompletion(),
         Terminate(),
