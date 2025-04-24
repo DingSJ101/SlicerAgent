@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Annotated, Optional
 
 import vtk
 
@@ -21,7 +20,8 @@ import sys
 sys.path.append("/home/dsj/workspace/LLM/SlicerAgent")
 sys.path.append("/home/dsj/workspace/LLM/SlicerAgent/.venv/lib/python3.9/site-packages")
 try:
-    from app.agent.slicer_agent import SlicerAgentProcess
+    from app.slicer.process import SlicerAgentProcess
+    from typing import Annotated, Optional
 except ImportError as e:
     print(f"Error importing SlicerAgent: {e}")
 
