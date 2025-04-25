@@ -67,7 +67,8 @@ try:
             self.running = False
 
         def start_agent(self):
-            cmd = "PythonSlicer"
+            # cmd = "PythonSlicer"
+            cmd = "/home/dsj/workspace/LLM/SlicerAgent/.venv/bin/python" # TODO: use PythonSlicer
 
             main_script_file = pathlib.Path(__file__).parent.parent.parent / "main.py"
             script_file = str(main_script_file)
