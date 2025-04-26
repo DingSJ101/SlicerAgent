@@ -237,13 +237,11 @@ class Memory(BaseModel):
 
 class Payload(BaseModel):
     content: str
-    type: str = Literal["message","image","info","error","command","system"]
+    type: str = Literal["message","image","info","error",\
+                        "command","system","toolcall","functioncall"]
     name: Optional[str] = None
     def __init__(self, content: str, type: str = "message",name = None):
         super().__init__(content=content, type=type, name=name)
-        # self.content = content
-        # self.type = type
-        # self.name = name
 
     def model_dump(self):
         if self.name is not None:
@@ -266,9 +264,9 @@ class Payload(BaseModel):
         sys.stdout.flush()
     
     @staticmethod
-    def write_message(content:str):
+    def write_message(content:str, type:str = "message"):
         data = {
-                "type": "message",
+                "type": type,
                 "content": content
             }
         json.dump(data, sys.stdout)

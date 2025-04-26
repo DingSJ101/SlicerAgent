@@ -768,7 +768,7 @@ class LLM:
                     if chunk.choices[0].delta.tool_calls[0].function.name:
                         current_function = chunk.choices[0].delta.tool_calls[0].function.name
                     content = chunk.choices[0].delta.tool_calls[0].function.arguments
-                    payload = Payload(content,type="command",name = current_function)
+                    payload = Payload(content,type="toolcall",name = current_function)
                     payload.write_structed_content()
                 else:
                     current_function = None

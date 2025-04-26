@@ -17,10 +17,17 @@ from abc import ABC, abstractmethod
 
 
 SLICER_SYSTEM_PROMPT = (
-    "You are SlicerAgent, an all-capable AI assistant for 3D Slicer, aimed at solving any task presented by the user. You have various tools at your disposal that you can call upon to efficiently complete complex requests."
+    "You are SlicerAgent, an all-capable AI assistant for 3D Slicer, aimed at solving any task presented by the user. "
+    "You have various tools that you can call upon to efficiently complete complex requests."
+    "You can respond to the user in two ways: "
+    "1. By using the `create_chat_completion` tool. "
+    "2. By directly responding to the user without any tool call."
 )
 SLICER_NEXT_STEP_PROMPT = (
-    "If you believe the user's initial task has been accomplished and wish to cease interaction, utilize the `terminate` tool/function call without any further approval. Otherwise, disregard this message and persist in fulfilling the task."
+    "If you believe the user's initial task has been accomplished in previous responses, "
+    "and wish to cease interaction to wait for instruction from user ,"
+    "utilize the `terminate` function call *immediately* without any further approval . "
+    "Otherwise, disregard this message and persist in fulfilling the task."
 )
 
 class SlicerMessageHandler(BaseModel):
@@ -54,7 +61,8 @@ class SlicerBaseAgent(SlicerMessageHandler, BaseAgent):
     name: str = "SlicerAgent"
     description: str = "A versatile agent that can solve various tasks using multiple tools"
 
-    system_prompt: str = SLICER_SYSTEM_PROMPT 
+    system_prompt: str = SLICER_SYSTEM_PROMPT
+    next_step_prompt: str = SLICER_NEXT_STEP_PROMPT
 
 
     max_observe: int = 10000
@@ -74,8 +82,7 @@ class SlicerBaseAgent(SlicerMessageHandler, BaseAgent):
                     else:
                         self.write_message_to_main_process("No content in message", type="error")
                 elif data.get("type") == "command":
-                    command = data.get("content")
-                    if command == "exit":
+                    if data.get("content") == "exit":
                         break
             except Exception as e:
                 self.write_message_to_main_process(f"Error in run_loop: {e}", type="error")

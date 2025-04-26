@@ -18,10 +18,8 @@ from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCur
 
 import sys
 sys.path.append("/home/dsj/workspace/LLM/SlicerAgent")
-sys.path.append("/home/dsj/workspace/LLM/SlicerAgent/.venv/lib/python3.9/site-packages")
 try:
     from app.slicer.process import SlicerAgentProcess
-    from typing import Annotated, Optional
 except ImportError as e:
     print(f"Error importing SlicerAgent: {e}")
 
