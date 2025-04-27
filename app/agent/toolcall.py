@@ -47,9 +47,11 @@ class ToolCallAgent(ReActAgent):
             self.messages += [user_msg]
 
         try:
-            tools = self.available_tools.to_params() \
+            native_tools = self.available_tools.to_params() \
                 if self.current_step > 1 \
                 else self.available_tools.to_params_exclude()
+            mcp_tools = self.available_mcp_tools.to_params() if "available_mcp_tools" in self.model_fields else None
+            tools = native_tools + mcp_tools
             response:Message = await self.llm.ask(
                 messages=self.messages,
                 system_msgs=(

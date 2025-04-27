@@ -25,4 +25,5 @@ if __name__ == "__main__":
 # {"content": "exit", "type": "command"}
 # {"content": "Which nodes are there in the Slicer", "type": "message"}
 # {"content": "How many nodes are there in Slicer", "type": "message"}
+# {"content": "How to use python code to print these nodes in Slicer?", "type": "message"}
 

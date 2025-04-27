@@ -12,7 +12,7 @@ from app.tool.tool_collection import ToolCollection
 
 class MCPClientTool(BaseTool):
     """Represents a tool proxy that can be called on the MCP server from the client side."""
-
+    mcp_name:str = "mcp_server_name"
     session: Optional[ClientSession] = None
 
     async def execute(self, **kwargs) -> ToolResult:
@@ -28,7 +28,11 @@ class MCPClientTool(BaseTool):
             return ToolResult(output=content_str or "No output returned.")
         except Exception as e:
             return ToolResult(error=f"Error executing tool: {str(e)}")
-
+        
+    def to_param(self):
+        param = super().to_param()
+        param["function"]["name"] = self.mcp_name + "_" + self.name  # needs to match pattern '^[a-zA-Z0-9_-]+$'
+        return param
 
 class MCPClients(ToolCollection):
     """
@@ -92,7 +96,8 @@ class MCPClients(ToolCollection):
         # Create proper tool objects for each server tool
         for tool in response.tools:
             server_tool = MCPClientTool(
-                name=tool.name,
+                name = tool.name,
+                mcp_name = self.name,
                 description=tool.description,
                 parameters=tool.inputSchema,
                 session=self.session,

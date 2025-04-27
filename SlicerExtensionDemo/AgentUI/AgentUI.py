@@ -17,7 +17,11 @@ from slicer import vtkMRMLScalarVolumeNode
 from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCursor
 
 import sys
-sys.path.append("/home/dsj/workspace/LLM/SlicerAgent")
+module_dir = os.path.dirname(os.path.abspath(__file__))
+extension_dir = os.path.dirname(module_dir)
+project_dir = os.path.dirname(extension_dir)
+sys.path.append(project_dir)
+
 try:
     from app.slicer.process import SlicerAgentProcess
 except ImportError as e:
