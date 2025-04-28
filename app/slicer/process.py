@@ -2,17 +2,87 @@ import json
 
 import pathlib
 
+# TODO : fix bug when '"' is in the value
+class JSONStreamParser:
+    def __init__(self,key_to_find=None, postprocessor=None):
+        if key_to_find is None:
+            key_to_find = 'response'
+        if postprocessor is None:
+            postprocessor = lambda *args, **kwargs: print(*args, **kwargs)
+        self.key_to_find = key_to_find
+        self.postprocessor = postprocessor
+        self.state = 'seeking_key'
+        self.current_key = None
+        self.inside_string = False
+        self.escape = False
+        self.current_value = []
+        self.buffer = ''
+
+    def feed(self, chunk):
+        self.buffer += chunk
+        self._process_buffer()
+
+    def _process_buffer(self):
+        while self.buffer:
+            char = self.buffer[0]
+            self.buffer = self.buffer[1:]
+            if self.state == 'seeking_key':
+                if char == '"':
+                    self.current_key_part = []
+                    self.state = 'collecting_key'
+            elif self.state == 'collecting_key':
+                if char == '"':
+                    key = ''.join(self.current_key_part)
+                    if key == 'response':
+                        self.current_key = key
+                        self.state = 'seeking_colon'
+                    else:
+                        self.state = 'seeking_key'
+                    self.current_key_part = []
+                else:
+                    self.current_key_part.append(char)
+            elif self.state == 'seeking_colon':
+                if char == ':':
+                    self.state = 'waiting_for_value'
+            elif self.state == 'waiting_for_value':
+                if char == '"':
+                    self.inside_string = True
+                    self.current_value = []
+                    self.state = 'collecting_value'
+            elif self.state == 'collecting_value':
+                if self.inside_string:
+                    if char == '"':
+                        self.inside_string = False
+                        self.state = 'seeking_key'
+                        self.current_value = []
+                    elif char == '\\':
+                        self.escape = True
+                    else:
+                        if self.escape:
+                            self.current_value.append(char)
+                            self.escape = False
+                        else:
+                            self.current_value.append(char)
+                        # 实时打印当前字符
+                        self.postprocessor(self.current_value[-1])
+                else:
+                    # 非字符串值暂时忽略
+                    pass
+
+
 try:
     # rely on the qt module wrapped in Slicer through PythonQt
     from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCursor, QProcess, Signal, Qt, QEvent, QTimer, QProcessEnvironment
     class SlicerAgentProcess(QProcess):
         streaming_output = Signal(str) # 主进程绑定该信号
+        response_finish = Signal() # 主进程绑定该信号
 
         def __init__(self):
             super().__init__()
             self._buffer = ""
             self._in_response_string = False  # Tracks if we're inside response string
             self._last_chunk_type = None
+            self._chat_completion_parser = JSONStreamParser(key_to_find="response", postprocessor=lambda s:self.streaming_output.emit(s))
             self.readyReadStandardOutput.connect(self._handle_stdout)
             self.errorOccurred.connect(lambda: print(f"进程错误: {self.errorString()}"))
             self.finished.connect(lambda: print(f"进程结束: {self.exitCode()}"))
@@ -65,13 +135,9 @@ try:
             """
             content = data.get("content").replace("\\n", "\n")
             if data.get("name") == "create_chat_completion":
-                if self._in_response_string and self._last_chunk_type == "toolcall":
-                    self.streaming_output.emit(content)
-                else:
-                    if "response" in content: # TODO: make it more robust
-                        self._in_response_string = True # start streaming after "response" parameter appear 
+                self._chat_completion_parser.feed(content)
             else:
-                self._in_response_string = False # BUG: can't handle continue create_chat_completion tool call
+                ...
 
         def send_messages(self,messages):
             data = {
