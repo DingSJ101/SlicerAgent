@@ -14,6 +14,7 @@ from app.tool.search import (
     WebSearchEngine,
 )
 from app.tool.search.base import SearchItem
+from app.schema import Payload
 
 
 class SearchResult(BaseModel):
@@ -297,6 +298,9 @@ class WebSearch(BaseTool):
 
             if not search_items:
                 continue
+            Payload.write_message("Searching ... \n")
+            for i,item in enumerate(search_items):
+                Payload.write_message(f"[{str(i+1):2}/{num_results:>2}]  {item.url}\n","info")
 
             if failed_engines:
                 logger.info(
@@ -409,4 +413,4 @@ if __name__ == "__main__":
             query="Python programming", fetch_content=True, num_results=1
         )
     )
-    print(search_response.to_tool_result())
+    print(search_response)

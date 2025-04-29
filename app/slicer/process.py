@@ -2,15 +2,18 @@ import json
 
 import pathlib
 
+from typing import Callable
+
 # TODO : fix bug when '"' is in the value
 class JSONStreamParser:
-    def __init__(self,key_to_find=None, postprocessor=None):
+    def __init__(self,key_to_find:str =None, send:Callable = None):
         if key_to_find is None:
             key_to_find = 'response'
-        if postprocessor is None:
-            postprocessor = lambda *args, **kwargs: print(*args, **kwargs)
+        if send is None:
+            def send(*args, **kwargs):
+                return print(*args, **kwargs)
         self.key_to_find = key_to_find
-        self.postprocessor = postprocessor
+        self.send = send
         self.state = 'seeking_key'
         self.current_key = None
         self.inside_string = False
@@ -63,8 +66,7 @@ class JSONStreamParser:
                             self.escape = False
                         else:
                             self.current_value.append(char)
-                        # 实时打印当前字符
-                        self.postprocessor(self.current_value[-1])
+                        self.send(self.current_value[-1])
                 else:
                     # 非字符串值暂时忽略
                     pass
@@ -75,17 +77,19 @@ try:
     from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCursor, QProcess, Signal, Qt, QEvent, QTimer, QProcessEnvironment
     class SlicerAgentProcess(QProcess):
         streaming_output = Signal(str) # 主进程绑定该信号
-        response_finish = Signal() # 主进程绑定该信号
+        response_finish = Signal()
+        start_toolcall = Signal(str)
+        finish_toolcall = Signal(str)
 
         def __init__(self):
             super().__init__()
             self._buffer = ""
-            self._in_response_string = False  # Tracks if we're inside response string
-            self._last_chunk_type = None
-            self._chat_completion_parser = JSONStreamParser(key_to_find="response", postprocessor=lambda s:self.streaming_output.emit(s))
+            self._chat_completion_parser = JSONStreamParser(key_to_find="response", send=lambda s:self.streaming_output.emit(s))
+            self._web_search_parser = JSONStreamParser("query", send=lambda s:self.streaming_output.emit(s))
             self.readyReadStandardOutput.connect(self._handle_stdout)
             self.errorOccurred.connect(lambda: print(f"进程错误: {self.errorString()}"))
             self.finished.connect(lambda: print(f"进程结束: {self.exitCode()}"))
+            self._last_chunk : str = ""
 
         def _handle_stdout(self):
             raw = self.readAllStandardOutput().data().decode()
@@ -105,14 +109,26 @@ try:
                     if self._buffer[start:].strip():
                         print("JSON decoding error, buffer:", self._buffer[start:].strip())
                     break
-
+                
+                current_chunk = data.get("type") + "/" + data.get("name","")
+                if current_chunk != self._last_chunk and self._last_chunk.startswith("toolcall"):
+                    self.finish_toolcall.emit(self._last_chunk.split("/")[1])
                 if data.get("type") == "message":
                     self._handle_messages(data)
                 elif data.get("type") == "error":
                     self._handle_error(data)
                 elif data.get("type") == "toolcall":
+                    if current_chunk != self._last_chunk:
+                        self.start_toolcall(current_chunk.split("/"))
+                        if data.get("name") == "web_search":
+                            self.streaming_output.emit("web search : ")
+                        elif data.get("name") == "terminate":
+                            self.response_finish.emit()
                     self._handle_tools(data)
-                self._last_chunk_type = data.get("type")
+                elif data.get("type") == "info":
+                    self._handle_info(data)
+                
+                self._last_chunk = data.get("type") + "/" + data.get("name","")
             # Keep only unprocessed data in buffer
             self._buffer = self._buffer[start:] if start < len(self._buffer) else ""
 
@@ -127,17 +143,20 @@ try:
         def _handle_request(self, data):
             """Handle human action request from the agent process."""
             ...
+        def _handle_info(self, data):
+            """Handle information passed from the agent process."""
+            self.streaming_output(data.get("content"))
 
         def _handle_tools(self, data):
             """Handle tool call message from the agent process.
             We use create_chat_completion tool to generate response in agent, 
             so we need to extract the content from the tool call message.
             """
-            content = data.get("content").replace("\\n", "\n")
+            content = data.get("content")
             if data.get("name") == "create_chat_completion":
                 self._chat_completion_parser.feed(content)
-            else:
-                ...
+            elif data.get("name") == "web_search":
+                self._web_search_parser.feed(content)
 
         def send_messages(self,messages):
             data = {

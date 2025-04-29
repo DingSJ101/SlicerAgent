@@ -101,7 +101,19 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.submitButton.clicked.connect(self.onSubmitClicked)
         self.ui.inputLine.returnPressed.connect(self.onSubmitClicked)
         self.agent_process.streaming_output.connect(self.onStreamingOutput)
+        self.agent_process.start_toolcall.connect(self.onStartToolcall)
+        self.agent_process.finish_toolcall.connect(self.onFinishToolcall)
+        self.agent_process.response_finish.connect(self.onResponseFinish)
         self.agent_process.start_agent()
+
+        self.ui.chatDisplay.append(f"<b>User:</b>")
+
+    def onStartToolcall(self,content):
+        print("start toolcall:",content)
+        self.ui.inputLine.setText(content)
+
+    def onFinishToolcall(self,content):
+        print("finish toolcall:",content)
 
     def onSubmitClicked(self):
         """处理用户输入"""
@@ -109,16 +121,20 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if not user_input:
             return
 
-        # 显示用户输入
-        self.ui.chatDisplay.append(f"<b>User:</b> {user_input}<br><b>Assistant:</b> ")
+        self.ui.chatDisplay.append(f"{user_input}<br><b>Assistant:</b> ")
         self.ui.inputLine.clear()
 
-        # 禁用输入以防止重复提交
-        # self.ui.inputLine.setEnabled(False)
-        # self.ui.submitButton.setEnabled(False)
+        self.ui.inputLine.setEnabled(False)
+        self.ui.submitButton.setEnabled(False)
 
-        # 将输入发送到工作线程
         self.agent_process.send_messages(user_input)
+
+    def onResponseFinish(self):
+        self.ui.inputLine.clear()
+        self.ui.chatDisplay.append(f"<b>User:</b> ")
+        self.ui.inputLine.setEnabled(True)
+        self.ui.submitButton.setEnabled(True)
+
 
     def onStreamingOutput(self, s):
         """显示流式输出"""
