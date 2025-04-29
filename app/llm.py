@@ -1,19 +1,20 @@
 import math
-from typing import Dict, List, Optional, Union, AsyncGenerator, AsyncIterator
+from typing import AsyncIterator, Dict, List, Optional, Union
 
 import tiktoken
 from openai import (
     APIError,
     AsyncOpenAI,
+    AsyncStream,
     AuthenticationError,
     OpenAIError,
     RateLimitError,
 )
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from tenacity import (
     retry,
     retry_if_exception_type,
-    stop_after_attempt, 
+    stop_after_attempt,
     wait_random_exponential,
 )
 
@@ -25,13 +26,10 @@ from app.schema import (
     TOOL_CHOICE_TYPE,
     TOOL_CHOICE_VALUES,
     Message,
-    ToolChoice,
     MessageChunk,
+    Payload,
+    ToolChoice,
 )
-from app.schema import Payload
-
-from openai import AsyncStream
-from openai.types.chat import ChatCompletionChunk, ChatCompletion
 
 REASONING_MODELS = ["o1", "o3-mini"]
 MULTIMODAL_MODELS = [
@@ -342,8 +340,6 @@ class LLM:
                     formatted_messages.append(message)
                 # else: do not include the message
             else:
-
-
                 raise TypeError(f"Unsupported message type: {type(message)}")
 
         # Validate all messages have required fields
@@ -362,7 +358,7 @@ class LLM:
     )
     async def ask(
         self,
-        messages: Union[List[Union[dict, Message]],str],
+        messages: Union[List[Union[dict, Message]], str],
         system_msgs: Optional[List[Union[dict, Message]]] = None,
         stream: bool = True,
         tools: Optional[List[dict]] = None,
@@ -396,10 +392,10 @@ class LLM:
                 messages = system_msgs + self.format_messages(messages)
             else:
                 messages = self.format_messages(messages)
-            
+
             # Validate tool_choice
             if tool_choice not in TOOL_CHOICE_VALUES:
-                raise ValueError(f"Invalid tool_choice: {tool_choice}") # TODO:fix
+                raise ValueError(f"Invalid tool_choice: {tool_choice}")  # TODO:fix
 
             input_tokens = self.count_message_tokens(messages)
             if tools:
@@ -410,25 +406,23 @@ class LLM:
                 error_message = self.get_limit_error_message(input_tokens)
                 raise TokenLimitExceeded(error_message)
 
-            completion:Message = await self.chat(
+            completion: Message = await self.chat(
                 messages,
                 stream=stream,
-                tools = tools,
-                tool_choice= tool_choice,
+                tools=tools,
+                tool_choice=tool_choice,
             )
 
             # estimate completion tokens for streaming response
             completion_tokens = self.count_tokens(completion.content)
             # self.total_completion_tokens += completion_tokens
             self.update_token_count(input_tokens, completion_tokens)
-            logger.info(
-                f"LLM response: {completion.content}"
-            )
+            logger.info(f"LLM response: {completion.content}")
             logger.info(
                 f"Estimated completion tokens for streaming response: {completion_tokens}"
             )
             return completion
-        
+
         except TokenLimitExceeded:
             # Re-raise token limit errors without logging
             raise
@@ -457,11 +451,14 @@ class LLM:
         **kwargs,
     ) -> Message:
         if stream:
-            response = await self.astream(messages,tool_choice=tool_choice, tools=tools, **kwargs)
+            response = await self.astream(
+                messages, tool_choice=tool_choice, tools=tools, **kwargs
+            )
         else:
-            response = await self.agenerate(messages,tool_choice=tool_choice, tools=tools, **kwargs)
+            response = await self.agenerate(
+                messages, tool_choice=tool_choice, tools=tools, **kwargs
+            )
         return response
-        
 
     @retry(
         wait=wait_random_exponential(min=1, max=60),
@@ -591,7 +588,7 @@ class LLM:
             async for chunk in response:
                 chunk_message = chunk.choices[0].delta.content or ""
                 collected_messages.append(chunk_message)
-                print(  chunk_message)
+                print(chunk_message)
 
             print()  # Newline after streaming
             full_response = "".join(collected_messages).strip()
@@ -628,7 +625,7 @@ class LLM:
     )
     async def ask_tool(
         self,
-        messages: Union[List[Union[dict, Message]],str],
+        messages: Union[List[Union[dict, Message]], str],
         system_msgs: Optional[List[Union[dict, Message]]] = None,
         timeout: int = 300,
         tools: Optional[List[dict]] = None,
@@ -670,7 +667,6 @@ class LLM:
             else:
                 messages = self.format_messages(messages)
 
-
             # Calculate input token count
             input_tokens = self.count_message_tokens(messages)
 
@@ -706,7 +702,9 @@ class LLM:
 
             # Non-streaming request
             params["stream"] = False
-            response: ChatCompletion = await self.client.chat.completions.create(**params)
+            response: ChatCompletion = await self.client.chat.completions.create(
+                **params
+            )
 
             # Check if response is valid
             if not response.choices or not response.choices[0].message:
@@ -739,21 +737,21 @@ class LLM:
             logger.error(f"Unexpected error in ask_tool: {e}")
             raise
 
-
     async def astream(
         self,
         messages: List[Union[dict, Message]],
         **kwargs,
-    )-> MessageChunk:
-        try:            
+    ) -> MessageChunk:
+        try:
             params = {
                 "model": self.model,
                 "messages": messages,
                 "stream": True,
                 **kwargs,
             }
-            response:AsyncStream[ChatCompletionChunk] = await\
-                self.client.chat.completions.create(**params)
+            response: AsyncStream[
+                ChatCompletionChunk
+            ] = await self.client.chat.completions.create(**params)
 
             completion = MessageChunk()
             current_function = None
@@ -761,14 +759,16 @@ class LLM:
                 content = chunk.choices[0].delta.content or ""
                 # chunk_message = MessageChunk(content)
                 chunk_message = MessageChunk(
-                    content = content,
-                    tool_calls= chunk.choices[0].delta.tool_calls,
+                    content=content,
+                    tool_calls=chunk.choices[0].delta.tool_calls,
                 )
                 if content in ["", None] and chunk.choices[0].delta.tool_calls:
                     if chunk.choices[0].delta.tool_calls[0].function.name:
-                        current_function = chunk.choices[0].delta.tool_calls[0].function.name
+                        current_function = (
+                            chunk.choices[0].delta.tool_calls[0].function.name
+                        )
                     content = chunk.choices[0].delta.tool_calls[0].function.arguments
-                    payload = Payload(content,type="toolcall",name = current_function)
+                    payload = Payload(content, type="toolcall", name=current_function)
                     payload.write_structed_content()
                 else:
                     current_function = None
@@ -793,8 +793,9 @@ class LLM:
                 "stream": False,
                 **kwargs,
             }
-            response:ChatCompletion= \
-                await self.client.chat.completions.create(**params)
+            response: ChatCompletion = await self.client.chat.completions.create(
+                **params
+            )
             message = response.choices[0].message
             if not message:
                 raise ValueError("Empty or invalid response from LLM")
@@ -803,8 +804,8 @@ class LLM:
             payload.write_structed_content()
             if message.tool_calls:
                 return Message.from_tool_calls(
-                    content = content,
-                    tool_calls = message.tool_calls,
+                    content=content,
+                    tool_calls=message.tool_calls,
                 )
             else:
                 return Message.assistant_message(content)
@@ -812,18 +813,19 @@ class LLM:
             logger.exception(f"Unexpected error in agenerate")
             raise
 
+
 async def test(question):
     llm = LLM()
     # test streaming
-    await llm.ask(question,stream=True)
+    await llm.ask(question, stream=True)
 
     # test non-streaming
-    await llm.ask(question,stream=False)
+    await llm.ask(question, stream=False)
 
 
 if __name__ == "__main__":
     # question = "Say 'double bubble bath' ten times fast."
     question = "who you are?"
     import asyncio
+
     asyncio.run(test(question))
-    

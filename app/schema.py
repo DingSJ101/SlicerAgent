@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 import sys
 import json
 
+
 class Role(str, Enum):
     """Message role options"""
 
@@ -46,6 +47,7 @@ class Function(BaseModel):
 
 class ToolCall(BaseModel):
     """Represents a tool/function call in a message"""
+
     index: int = Field(default=-1)
     id: Optional[str] = None
     type: str = "function"
@@ -147,7 +149,11 @@ class Message(BaseModel):
         formatted_calls = None
         if tool_calls:
             formatted_calls = [
-                {"id": call.id, "function": call.function.model_dump(), "type": "function"}
+                {
+                    "id": call.id,
+                    "function": call.function.model_dump(),
+                    "type": "function",
+                }
                 for call in tool_calls
             ]
         return cls(
@@ -158,13 +164,16 @@ class Message(BaseModel):
             **kwargs,
         )
 
+
 class MessageChunk(Message):
-    type: str = Literal["message","toolcall"]
-    def __init__(self,content = "",**kwargs):
-        super().__init__(role = Role.ASSISTANT)
+    type: str = Literal["message", "toolcall"]
+
+    def __init__(self, content="", **kwargs):
+        super().__init__(role=Role.ASSISTANT)
         self.content = content
         self.type = "message"
         self.tool_calls = kwargs.get("tool_calls", None)
+
     def __add__(self, other) -> List["MessageChunk"]:
         if not isinstance(other, MessageChunk):
             raise TypeError(
@@ -202,8 +211,6 @@ class MessageChunk(Message):
                             existing.function.arguments += delta.function.arguments
         return self.__class__(content=new_content, tool_calls=new_tool_calls)
 
-        
-
 
 class Memory(BaseModel):
     messages: List[Message] = Field(default_factory=list)
@@ -235,26 +242,29 @@ class Memory(BaseModel):
         """Convert messages to list of dicts"""
         return [msg.to_dict() for msg in self.messages]
 
+
 class Payload(BaseModel):
     content: str
-    type: str = Literal["message","image","info","error",\
-                        "command","system","toolcall","functioncall"]
+    type: str = Literal[
+        "message",
+        "image",
+        "info",
+        "error",
+        "command",
+        "system",
+        "toolcall",
+        "functioncall",
+    ]
     name: Optional[str] = None
-    def __init__(self, content: str, type: str = "message",name = None):
+
+    def __init__(self, content: str, type: str = "message", name=None):
         super().__init__(content=content, type=type, name=name)
 
     def model_dump(self):
         if self.name is not None:
-            return {
-                "type": self.type,
-                "content": self.content,
-                "name": self.name
-            }
+            return {"type": self.type, "content": self.content, "name": self.name}
         else:
-            return {
-                "type": self.type,
-                "content": self.content
-            }
+            return {"type": self.type, "content": self.content}
 
     def write_structed_content(self):
         """
@@ -262,17 +272,14 @@ class Payload(BaseModel):
         """
         json.dump(self.model_dump(), sys.stdout)
         sys.stdout.flush()
-    
+
     @staticmethod
-    def write_message(content:str, type:str = "message"):
-        data = {
-                "type": type,
-                "content": content
-            }
+    def write_message(content: str, type: str = "message"):
+        data = {"type": type, "content": content}
         json.dump(data, sys.stdout)
         sys.stdout.flush()
 
     @classmethod
-    def from_message(cls,message:Message) -> "Payload":
+    def from_message(cls, message: Message) -> "Payload":
         content = message.content
-        return cls(content=content,type = "message")
+        return cls(content=content, type="message")

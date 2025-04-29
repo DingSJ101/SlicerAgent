@@ -1,22 +1,15 @@
 import logging
 import os
-
-import vtk
+import sys
 
 import slicer
+from qt import QTextCursor
+from slicer import vtkMRMLScalarVolumeNode
 from slicer.i18n import tr as _
 from slicer.i18n import translate
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from slicer.parameterNodeWrapper import (
-    parameterNodeWrapper,
-    WithinRange,
-)
 
-from slicer import vtkMRMLScalarVolumeNode
-from qt import QLineEdit, QTextEdit, QPushButton, QVBoxLayout, QWidget, QTextCursor
-
-import sys
 module_dir = os.path.dirname(os.path.abspath(__file__))
 extension_dir = os.path.dirname(module_dir)
 project_dir = os.path.dirname(extension_dir)
@@ -40,22 +33,12 @@ class AgentUI(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = _("AgentUI")  # TODO: make this more human readable by adding spaces
-        # TODO: set categories (folders where the module shows up in the module selector)
-        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
-        self.parent.dependencies = []  # TODO: add here list of module names that this module requires
-        self.parent.contributors = ["John Doe (AnyWare Corp.)"]  # TODO: replace with "Firstname Lastname (Organization)"
-        # TODO: update with short description of the module and a link to online module documentation
-        # _() function marks text as translatable to other languages
-        self.parent.helpText = _("""
-This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#AgentUI">module documentation</a>.
-""")
-        # TODO: replace with organization, grant and thanks
-        self.parent.acknowledgementText = _("""
-This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc., Andras Lasso, PerkLab,
-and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
-""")
+        self.parent.title = _("AgentUI")
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Agent")]
+        self.parent.dependencies = []
+        self.parent.contributors = ["Shijie Ding"]
+        self.parent.helpText = _("""This is an demo extension for SlicerAgent.""")
+        self.parent.acknowledgementText = _("")
 
 
 #
@@ -108,12 +91,12 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.ui.chatDisplay.append(f"<b>User:</b>")
 
-    def onStartToolcall(self,content):
-        print("start toolcall:",content)
+    def onStartToolcall(self, content):
+        print("start toolcall:", content)
         self.ui.inputLine.setText(content)
 
-    def onFinishToolcall(self,content):
-        print("finish toolcall:",content)
+    def onFinishToolcall(self, content):
+        print("finish toolcall:", content)
 
     def onSubmitClicked(self):
         """处理用户输入"""
@@ -135,13 +118,11 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.inputLine.setEnabled(True)
         self.ui.submitButton.setEnabled(True)
 
-
     def onStreamingOutput(self, s):
         """显示流式输出"""
         self.ui.chatDisplay.moveCursor(QTextCursor.End)
         self.ui.chatDisplay.insertPlainText(s)
         self.ui.chatDisplay.ensureCursorVisible()
-
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -153,7 +134,6 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         """Called each time the user opens this module."""
         # Make sure parameter node exists and observed
         ...
-        
 
     def exit(self) -> None:
         """Called each time the user opens a different module."""
@@ -180,12 +160,14 @@ class AgentUILogic(ScriptedLoadableModuleLogic):
         """Called when the logic class is instantiated. Can be used for initializing member variables."""
         ScriptedLoadableModuleLogic.__init__(self)
 
-    def process(self,
-                inputVolume: vtkMRMLScalarVolumeNode,
-                outputVolume: vtkMRMLScalarVolumeNode,
-                imageThreshold: float,
-                invert: bool = False,
-                showResult: bool = True) -> None:
+    def process(
+        self,
+        inputVolume: vtkMRMLScalarVolumeNode,
+        outputVolume: vtkMRMLScalarVolumeNode,
+        imageThreshold: float,
+        invert: bool = False,
+        showResult: bool = True,
+    ) -> None:
         """
         Run the processing algorithm.
         Can be used without GUI widget.
@@ -211,12 +193,18 @@ class AgentUILogic(ScriptedLoadableModuleLogic):
             "ThresholdValue": imageThreshold,
             "ThresholdType": "Above" if invert else "Below",
         }
-        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
+        cliNode = slicer.cli.run(
+            slicer.modules.thresholdscalarvolume,
+            None,
+            cliParams,
+            wait_for_completion=True,
+            update_display=showResult,
+        )
         # We don't need the CLI module node anymore, remove it to not clutter the scene with it
         slicer.mrmlScene.RemoveNode(cliNode)
 
         stopTime = time.time()
-        logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
+        logging.info(f"Processing completed in {stopTime - startTime:.2f} seconds")
 
 
 #

@@ -299,8 +299,10 @@ class WebSearch(BaseTool):
             if not search_items:
                 continue
             Payload.write_message("Searching ... \n")
-            for i,item in enumerate(search_items):
-                Payload.write_message(f"[{str(i+1):2}/{num_results:>2}]  {item.url}\n","info")
+            for i, item in enumerate(search_items):
+                Payload.write_message(
+                    f"[{str(i + 1):2}/{num_results:>2}]  {item.url}\n", "info"
+                )
 
             if failed_engines:
                 logger.info(
@@ -313,7 +315,7 @@ class WebSearch(BaseTool):
                     position=i + 1,
                     url=item.url,
                     title=item.title
-                    or f"Result {i+1}",  # Ensure we always have a title
+                    or f"Result {i + 1}",  # Ensure we always have a title
                     description=item.description or "",
                     source=engine_name,
                 )

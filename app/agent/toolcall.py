@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Any, List, Optional, Union, AsyncIterator
+from typing import Any, List, Optional, Union
 
 from pydantic import Field
 
@@ -10,7 +10,6 @@ from app.logger import logger
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
 from app.tool import CreateChatCompletion, Terminate, ToolCollection, WebSearch
-from app.schema import MessageChunk, Payload
 
 TOOL_CALL_REQUIRED = "Tool calls required but none provided"
 
@@ -25,9 +24,7 @@ class ToolCallAgent(ReActAgent):
     next_step_prompt: str = NEXT_STEP_PROMPT
 
     available_tools: ToolCollection = ToolCollection(
-        CreateChatCompletion(), 
-        Terminate(),
-        WebSearch()
+        CreateChatCompletion(), Terminate(), WebSearch()
     )
     tool_choices: TOOL_CHOICE_TYPE = ToolChoice.AUTO  # type: ignore
     special_tool_names: List[str] = Field(default_factory=lambda: [Terminate().name])
@@ -47,12 +44,18 @@ class ToolCallAgent(ReActAgent):
             self.messages += [user_msg]
 
         try:
-            native_tools = self.available_tools.to_params() \
-                if self.current_step > 1 \
+            native_tools = (
+                self.available_tools.to_params()
+                if self.current_step > 1
                 else self.available_tools.to_params_exclude()
-            mcp_tools = self.available_mcp_tools.to_params() if "available_mcp_tools" in self.model_fields else None
+            )
+            mcp_tools = (
+                self.available_mcp_tools.to_params()
+                if "available_mcp_tools" in self.model_fields
+                else None
+            )
             tools = native_tools + mcp_tools
-            response:Message = await self.llm.ask(
+            response: Message = await self.llm.ask(
                 messages=self.messages,
                 system_msgs=(
                     [Message.system_message(self.system_prompt)]
@@ -267,16 +270,13 @@ class ToolCallAgent(ReActAgent):
         finally:
             await self.cleanup()
 
+
 if __name__ == "__main__":
     question = "What is the capital of France?"
     question = "Tell me a joke!"
     # question = "我想要日本10天的旅行计划，4-26到5-5日，请你帮我做一份非常详细的旅行、餐饮 计划， 一 共两个人，预算3w，偏向自然风格 ，以markdown格式回答，要具体的时间节点，以及通勤时间"
     question = "generate a python code to calculate the sum of two numbers with create_chatcompletion tool"
-    tools = ToolCollection(        
-        CreateChatCompletion(),
-        Terminate(),
-        WebSearch()
-    )
+    tools = ToolCollection(CreateChatCompletion(), Terminate(), WebSearch())
     # agent = ToolCallAgent()
     # asyncio.run(agent.run(question))
     # agent = ToolCallAgent(available_tools=tools,streaming_output=False)

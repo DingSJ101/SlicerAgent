@@ -1,4 +1,5 @@
 """Collection classes for managing multiple tools."""
+
 from typing import Any, Dict, List
 
 from app.exceptions import ToolError
@@ -20,12 +21,11 @@ class ToolCollection:
 
     def to_params(self) -> List[Dict[str, Any]]:
         return [tool.to_param() for tool in self.tools]
-    
+
     def to_params_exclude(self, *exclude: str) -> List[Dict[str, Any]]:
         if not exclude:
-            exclude = ['terminate']
+            exclude = ["terminate"]
         return [tool.to_param() for tool in self.tools if tool.name not in exclude]
-
 
     async def execute(
         self, *, name: str, tool_input: Dict[str, Any] = None

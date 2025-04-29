@@ -1,20 +1,13 @@
 import asyncio
-import sys
-import re
 import json
 import sys
-from app.logger import logger
 from typing import Literal
 
-from app.agent import BaseAgent, ReActAgent, ToolCallAgent, MCPAgent
+from pydantic import BaseModel
+
+from app.agent import BaseAgent, MCPAgent, ToolCallAgent
 from app.logger import logger
-from app.config import config
-from app.tool import Terminate, ToolCollection, WebSearch, CreateChatCompletion
-from pydantic import Field, model_validator, BaseModel
 from app.schema import Payload
-from abc import ABC, abstractmethod
-
-
 
 SLICER_SYSTEM_PROMPT = (
     "You are SlicerAgent, an all-capable AI assistant for 3D Slicer, aimed at solving any task presented by the user. "
@@ -32,9 +25,10 @@ SLICER_NEXT_STEP_PROMPT = (
     "Otherwise, disregard this message and persist in fulfilling the task."
 )
 
+
 class SlicerMessageHandler(BaseModel):
     """A base agent class for 3D Slicer with stdio communication.
-    
+
     Methods:
         load_message_from_main_process() -> dict: Reads a line from stdin and parses it as JSON.
         write_message_to_main_process(message: str, type: str = "message") -> None: Writes a message to the main process.
@@ -54,22 +48,27 @@ class SlicerMessageHandler(BaseModel):
             logger.error("Error parsing JSON:", line)
             return None
 
-    def write_message_to_main_process(self, message: str, type:str = "message") -> None:
+    def write_message_to_main_process(
+        self, message: str, type: str = "message"
+    ) -> None:
         payload = Payload(content=message, type=type)
         payload.write_structed_content()
 
+
 class SlicerBaseAgent(SlicerMessageHandler, BaseAgent):
-    """ You shouldn't instantiate this class because method `step` hasn't been implemented """
+    """You shouldn't instantiate this class because method `step` hasn't been implemented"""
+
     name: str = "SlicerAgent"
-    description: str = "A versatile agent that can solve various tasks using multiple tools"
+    description: str = (
+        "A versatile agent that can solve various tasks using multiple tools"
+    )
 
     system_prompt: str = SLICER_SYSTEM_PROMPT
     next_step_prompt: str = SLICER_NEXT_STEP_PROMPT
 
-
     max_observe: int = 10000
     max_steps: int = 20
-    streaming_output:bool = True
+    streaming_output: bool = True
 
     async def run_loop(self):
         while True:
@@ -82,22 +81,35 @@ class SlicerBaseAgent(SlicerMessageHandler, BaseAgent):
                     if question:
                         await self.run(question)
                     else:
-                        self.write_message_to_main_process("No content in message", type="error")
+                        self.write_message_to_main_process(
+                            "No content in message", type="error"
+                        )
                 elif data.get("type") == "command":
                     if data.get("content") == "exit":
                         break
+                    elif data.get("content") == "clear":
+                        ...
             except Exception as e:
-                self.write_message_to_main_process(f"Error in run_loop: {e}", type="error")
+                self.write_message_to_main_process(
+                    f"Error in run_loop: {e}", type="error"
+                )
+
 
 class SlicerAgent(SlicerBaseAgent, ToolCallAgent):
     """A versatile general-purpose agent for 3D Slicer."""
 
+
 class SlicerAgentWithMCP(SlicerBaseAgent, MCPAgent):
-    """A versatile general-purpose agent for 3D Slicer. """
+    """A versatile general-purpose agent for 3D Slicer."""
+
     connection_type: Literal["stdio", "sse"] = "sse"
+
     async def run_loop(self):
-        await self.initialize(connection_type="sse",server_url="http://localhost:6666/sse")
-        return await super().run_loop()
+        await self.initialize(
+            connection_type="sse", server_url="http://localhost:6666/sse"
+        )
+        await super().run_loop()
+
 
 if __name__ == "__main__":
     agent = SlicerAgent()
@@ -111,4 +123,3 @@ if __name__ == "__main__":
 #             ReActAgent.think() > ToolCallAgent.think()
 #             if ReActAgent.act() > ToolCallAgent.act():
 #                 ToolCallAgent.execute_tool()
-
