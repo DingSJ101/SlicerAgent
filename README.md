@@ -9,7 +9,7 @@ SlicerAgent is a manus-like agent in 3D Slicer.
 
 ## Demo
 
-![demo](static/slicer_agent_demo.gif)
+![demo](./static/slicer_agent_demo.gif)
 
 ## QuickStart (Maybe)
 
@@ -24,7 +24,14 @@ cd sliceragent
 uv sync
 ```
 3. replace python path in app/slicer/process.py with your uv python executable
-4. run SlicerAgent out of Slicer
+4. config your LLM
+```bash
+cp config/config.example.toml config/config.toml
+# modify items for your own settings
+```
+> Ollama perferms strange when streaming toolcalling, we don't recommand you to use ollama as backend.
+> More information about this bug can be found [here](https://github.com/ollama/ollama/issues/7886)
+5. run SlicerAgent out of Slicer
 ```bash
 uv run python main.py
 # input below lines in the terminal
@@ -33,7 +40,7 @@ uv run python main.py
 {"content": "How many nodes are there in Slicer", "type": "message"}
 {"content": "How to use python code to print these nodes in Slicer?", "type": "message"}
 ```
-5. run SlicerAgent in Slicer: 
+6. run SlicerAgent in Slicer: 
 - Firstly add directory `SlicerExtensionDemo` as an extension in your 
 Slicer.
 - Start Slicer and start server in  `Web Server` extention.
