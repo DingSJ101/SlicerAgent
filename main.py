@@ -27,3 +27,4 @@ if __name__ == "__main__":
 # {"content": "How many nodes are there in Slicer", "type": "message"}
 # {"content": "How to use python code to print these nodes in Slicer?", "type": "message"}
 # {"content": "What's the weather of 2025.04.29 in Shanghai?", "type": "message"}
+# {"content": "clear", "type": "command"}

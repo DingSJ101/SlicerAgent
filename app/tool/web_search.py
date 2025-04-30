@@ -301,7 +301,7 @@ class WebSearch(BaseTool):
             Payload.write_message("Searching ... \n")
             for i, item in enumerate(search_items):
                 Payload.write_message(
-                    f"[{str(i + 1):2}/{num_results:>2}]  {item.url}\n", "info"
+                    f"[{str(i + 1):2}/{num_results:>2}]  {item.url}\n", "message"
                 )
 
             if failed_engines:

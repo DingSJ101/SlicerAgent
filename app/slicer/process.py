@@ -133,7 +133,7 @@ try:
                     self._handle_error(data)
                 elif data.get("type") == "toolcall":
                     if current_chunk != self._last_chunk:
-                        self.start_toolcall(current_chunk.split("/"))
+                        self.start_toolcall(current_chunk.split("/")[1])
                         if data.get("name") == "web_search":
                             self.streaming_output.emit("web search : ")
                         elif data.get("name") == "terminate":
@@ -162,7 +162,7 @@ try:
 
         def _handle_info(self, data):
             """Handle information passed from the agent process."""
-            self.streaming_output(data.get("content"))
+            print(f"Info: {data.get('content')}")
 
         def _handle_tools(self, data):
             """Handle tool call message from the agent process.
@@ -175,11 +175,16 @@ try:
             elif data.get("name") == "web_search":
                 self._web_search_parser.feed(content)
 
-        def send_messages(self, messages):
+        def send_messages(self, messages: str):
             data = {"type": "message", "content": messages}
             messages = json.dumps(data)
             self.write(f"{messages}\n")
             print(f"send message: {messages}")
+
+        def send_command(self, content: str):
+            data = {"type": "command", "content": content}
+            self.write(f"{json.dumps(data)}\n")
+            print(f"send command: {content}")
 
         def stop(self):
             self.running = False

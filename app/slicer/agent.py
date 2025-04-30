@@ -82,13 +82,17 @@ class SlicerBaseAgent(SlicerMessageHandler, BaseAgent):
                         await self.run(question)
                     else:
                         self.write_message_to_main_process(
-                            "No content in message", type="error"
+                            "No content in message", type="info"
                         )
                 elif data.get("type") == "command":
                     if data.get("content") == "exit":
                         break
                     elif data.get("content") == "clear":
-                        ...
+                        self.current_step = 0
+                        self.memory.clear()
+                        self.write_message_to_main_process(
+                            "Memory cleared", type="info"
+                        )
             except Exception as e:
                 self.write_message_to_main_process(
                     f"Error in run_loop: {e}", type="error"

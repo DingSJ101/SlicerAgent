@@ -39,9 +39,18 @@ class ToolCallAgent(ReActAgent):
 
     async def think(self) -> bool:
         """Process current state and decide next actions using tools"""
-        if self.next_step_prompt and self.current_step > 1:
-            user_msg = Message.user_message(self.next_step_prompt)
-            self.messages += [user_msg]
+
+        if self.current_step > 1:
+            if self.next_step_prompt:
+                user_message = Message.user_message(self.next_step_prompt)
+                self.messages += [user_message]
+            system_message = None
+        else:
+            system_message = (
+                [Message.system_message(self.system_prompt)]
+                if self.system_prompt
+                else None
+            )
 
         try:
             native_tools = (
@@ -57,11 +66,7 @@ class ToolCallAgent(ReActAgent):
             tools = native_tools + mcp_tools
             response: Message = await self.llm.ask(
                 messages=self.messages,
-                system_msgs=(
-                    [Message.system_message(self.system_prompt)]
-                    if self.system_prompt
-                    else None
-                ),
+                system_msgs=system_message,
                 tools=tools,
                 tool_choice=self.tool_choices,
                 stream=self.streaming_output,

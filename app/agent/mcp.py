@@ -78,11 +78,11 @@ class MCPAgent(ToolCallAgent):
         tools_info = ", ".join(tool_names)
 
         # Add system prompt and available tools information
-        self.memory.add_message(
-            Message.system_message(
-                f"{self.system_prompt}\n\nAvailable MCP tools: {tools_info}"
-            )
-        )
+        # self.memory.add_message(
+        #     Message.system_message(
+        #         f"{self.system_prompt}\n\nAvailable MCP tools: {tools_info}"
+        #     )
+        # )
 
     async def _refresh_tools(self) -> Tuple[List[str], List[str]]:
         """Refresh the list of available tools from the MCP server.

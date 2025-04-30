@@ -83,6 +83,7 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
         self.ui.submitButton.clicked.connect(self.onSubmitClicked)
         self.ui.inputLine.returnPressed.connect(self.onSubmitClicked)
+        self.ui.clearButton.clicked.connect(self.onNewChatButtonClicked)
         self.agent_process.streaming_output.connect(self.onStreamingOutput)
         self.agent_process.start_toolcall.connect(self.onStartToolcall)
         self.agent_process.finish_toolcall.connect(self.onFinishToolcall)
@@ -91,8 +92,10 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.ui.chatDisplay.append(f"<b>User:</b>")
 
-    def onStartToolcall(self, content):
+    def onStartToolcall(self, content: str):
         print("start toolcall:", content)
+        if content == "create_chat_completion":
+            content = "generating ..."
         self.ui.inputLine.setText(content)
 
     def onFinishToolcall(self, content):
@@ -111,6 +114,11 @@ class AgentUIWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.submitButton.setEnabled(False)
 
         self.agent_process.send_messages(user_input)
+
+    def onNewChatButtonClicked(self):
+        self.agent_process.send_command("clear")
+        self.ui.chatDisplay.clear()
+        self.ui.chatDisplay.append(f"<b>User:</b>")
 
     def onResponseFinish(self):
         self.ui.inputLine.clear()
