@@ -63,7 +63,10 @@ class ToolCallAgent(ReActAgent):
                 if "available_mcp_tools" in self.model_fields
                 else None
             )
-            tools = native_tools + mcp_tools
+            if mcp_tools:
+                tools = native_tools + mcp_tools
+            else:
+                tools = native_tools
             response: Message = await self.llm.ask(
                 messages=self.messages,
                 system_msgs=system_message,
